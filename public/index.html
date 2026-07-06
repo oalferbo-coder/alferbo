@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mantenimiento - Seguimiento diario</title>
+<style>
+  :root { --bg:#f5f6f8; --card:#fff; --ink:#1c2733; --muted:#5f6b7a; --line:#dde3ea; --accent:#0b6e4f; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.5 system-ui,sans-serif; background:var(--bg); color:var(--ink); }
+  header { background:var(--accent); color:#fff; padding:14px 20px; }
+  header h1 { margin:0; font-size:19px; }
+  header p { margin:2px 0 0; font-size:13px; opacity:.85; }
+  main { max-width:1100px; margin:20px auto; padding:0 16px; display:grid; gap:20px; grid-template-columns: 2fr 1fr; }
+  @media (max-width: 800px){ main { grid-template-columns:1fr; } }
+  section { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; }
+  h2 { margin:0 0 12px; font-size:16px; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th,td { text-align:left; padding:7px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; }
+  .pill { display:inline-block; padding:1px 8px; border-radius:999px; font-size:12px; background:#eef1f4; }
+  .pendiente { background:#fff3cd; } .en_curso { background:#cfe2ff; }
+  .terminada { background:#d1e7dd; } .bloqueada { background:#f8d7da; }
+  .p1 { color:#b02a37; font-weight:700; } .p2 { color:#997404; } .p3 { color:var(--muted); }
+  form { display:grid; gap:8px; margin-top:6px; }
+  input,select,button,textarea { font:inherit; padding:7px 9px; border:1px solid var(--line); border-radius:7px; width:100%; }
+  button { background:var(--accent); color:#fff; border:none; cursor:pointer; }
+  button.secondary { background:#eef1f4; color:var(--ink); }
+  .row { display:flex; gap:8px; } .row > * { flex:1; }
+  .actions button { width:auto; padding:3px 8px; font-size:12px; margin-right:4px; }
+  .muted { color:var(--muted); font-size:13px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Mantenimiento y Servicios - Seguimiento diario</h1>
+  <p>Asignacion diaria de tareas y control de avance, coordinado por WhatsApp</p>
+</header>
+<main>
+  <section>
+    <h2>Tareas</h2>
+    <table id="tasks-table">
+      <thead><tr><th>#</th><th>Prioridad</th><th>Sector</th><th>Trabajo</th><th>Asignada a</th><th>Estado</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <h2 style="margin-top:20px">Nueva tarea</h2>
+    <form id="task-form">
+      <div class="row">
+        <input name="sector" placeholder="Sector (ej: Gimnasio, Patio)">
+        <select name="priority">
+          <option value="1">Alta</option>
+          <option value="2" selected>Media</option>
+          <option value="3">Baja</option>
+        </select>
+      </div>
+      <textarea name="description" placeholder="Descripcion del trabajo" required rows="2"></textarea>
+      <div class="row">
+        <select name="assigned_to"><option value="">Sin asignar</option></select>
+        <input name="due_date" type="date">
+      </div>
+      <button>Crear y notificar por WhatsApp</button>
+    </form>
+    <p class="muted">Al asignar, la persona recibe la tarea por WhatsApp y puede responder
+      <b>TOMO n</b>, <b>LISTO n</b> o <b>PROBLEMA n detalle</b>. Con <b>TAREAS</b> consulta sus pendientes.</p>
+    <button class="secondary" style="width:auto" onclick="runFollowup()">Enviar seguimiento diario ahora</button>
+  </section>
+
+  <div style="display:grid; gap:20px; align-content:start">
+    <section>
+      <h2>Personal</h2>
+      <table id="staff-table">
+        <thead><tr><th>Nombre</th><th>Rol</th><th>Estado</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <form id="staff-form">
+        <input name="name" placeholder="Nombre" required>
+        <input name="phone" placeholder="WhatsApp (+598...)" required>
+        <select name="role_id" required></select>
+        <button>Agregar persona</button>
+      </form>
+    </section>
+
+    <section>
+      <h2>Roles</h2>
+      <ul id="roles-list" class="muted"></ul>
+      <form id="role-form">
+        <input name="name" placeholder="Nuevo rol (ej: jardinero)" required>
+        <input name="description" placeholder="Descripcion">
+        <button>Crear rol</button>
+      </form>
+    </section>
+  </div>
+</main>
+
+<script>
+const api = (url, opts) => fetch(url, opts).then(r => r.json());
+const PRIO = {1:'Alta',2:'Media',3:'Baja'};
+let staff = [], roles = [];
+
+async function refresh() {
+  [roles, staff] = await Promise.all([api('/api/roles'), api('/api/staff')]);
+  const tasks = await api('/api/tasks');
+
+  document.querySelector('#roles-list').innerHTML =
+    roles.map(r => `<li><b>${r.name}</b>${r.description ? ' - ' + r.description : ''}</li>`).join('');
+
+  const roleOpts = roles.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
+  document.querySelector('#staff-form [name=role_id]').innerHTML = roleOpts;
+
+  document.querySelector('#staff-table tbody').innerHTML = staff.map(s => `
+    <tr><td>${s.name}</td><td>${s.role_name}</td>
+    <td><span class="pill">${s.active ? 'activo' : 'inactivo'}</span></td></tr>`).join('');
+
+  const staffOpts = '<option value="">Sin asignar</option>' +
+    staff.filter(s => s.active).map(s => `<option value="${s.id}">${s.name} (${s.role_name})</option>`).join('');
+  document.querySelector('#task-form [name=assigned_to]').innerHTML = staffOpts;
+
+  document.querySelector('#tasks-table tbody').innerHTML = tasks.map(t => `
+    <tr>
+      <td>${t.id}</td>
+      <td class="p${t.priority}">${PRIO[t.priority]}</td>
+      <td>${t.sector || '-'}</td>
+      <td>${t.description}</td>
+      <td>${t.assigned_name ? t.assigned_name + ' <span class="muted">(' + t.assigned_role + ')</span>' : '-'}</td>
+      <td><span class="pill ${t.status}">${t.status.replace('_',' ')}</span></td>
+      <td class="actions">
+        ${t.status !== 'terminada' ? `<button onclick="setStatus(${t.id},'terminada')">Listo</button>` : ''}
+        ${t.status === 'pendiente' ? `<button onclick="setStatus(${t.id},'en_curso')">Iniciar</button>` : ''}
+      </td>
+    </tr>`).join('');
+}
+
+async function setStatus(id, status) {
+  await api('/api/tasks/' + id, { method:'PATCH', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ status }) });
+  refresh();
+}
+
+async function runFollowup() {
+  await api('/api/followup/run', { method:'POST' });
+  alert('Seguimiento diario enviado a todo el personal activo con tareas pendientes.');
+}
+
+function bindForm(sel, url, transform) {
+  document.querySelector(sel).addEventListener('submit', async e => {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.target));
+    if (transform) transform(data);
+    const res = await api(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
+    if (res.error) return alert(res.error);
+    e.target.reset();
+    refresh();
+  });
+}
+bindForm('#task-form', '/api/tasks', d => {
+  d.priority = Number(d.priority);
+  d.assigned_to = d.assigned_to ? Number(d.assigned_to) : null;
+});
+bindForm('#staff-form', '/api/staff', d => { d.role_id = Number(d.role_id); });
+bindForm('#role-form', '/api/roles');
+
+refresh();
+</script>
+</body>
+</html>
