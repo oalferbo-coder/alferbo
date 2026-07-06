@@ -67,7 +67,7 @@ app.patch('/api/staff/:id', (req, res) => {
 app.get('/api/tasks', (req, res) => {
   const { status, assigned_to } = req.query;
   let sql = `
-    SELECT t.*, s.name AS assigned_name, r.name AS assigned_role
+    SELECT t.*, s.name AS assigned_name, s.phone AS assigned_phone, r.name AS assigned_role
     FROM tasks t
     LEFT JOIN staff s ON s.id = t.assigned_to
     LEFT JOIN roles r ON r.id = s.role_id

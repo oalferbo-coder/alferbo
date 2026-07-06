@@ -28,6 +28,7 @@
   button.secondary { background:#eef1f4; color:var(--ink); }
   .row { display:flex; gap:8px; } .row > * { flex:1; }
   .actions button { width:auto; padding:3px 8px; font-size:12px; margin-right:4px; }
+  button.wa { background:#25d366; color:#fff; }
   .muted { color:var(--muted); font-size:13px; }
 </style>
 </head>
@@ -69,7 +70,7 @@
     <section>
       <h2>Personal</h2>
       <table id="staff-table">
-        <thead><tr><th>Nombre</th><th>Rol</th><th>Estado</th></tr></thead>
+        <thead><tr><th>Nombre</th><th>Rol</th><th>Estado</th><th></th></tr></thead>
         <tbody></tbody>
       </table>
       <form id="staff-form">
@@ -95,11 +96,41 @@
 <script>
 const api = (url, opts) => fetch(url, opts).then(r => r.json());
 const PRIO = {1:'Alta',2:'Media',3:'Baja'};
-let staff = [], roles = [];
+let staff = [], roles = [], allTasks = [];
+
+// Modo wa.me: abre WhatsApp con el mensaje pronto para enviar desde tu telefono.
+// No requiere Twilio; el envio es manual y los estados se actualizan desde este panel.
+function openWa(phone, text) {
+  const num = phone.replace(/[^\d]/g, '');
+  window.open(`https://wa.me/${num}?text=${encodeURIComponent(text)}`, '_blank');
+}
+
+function waTask(id) {
+  const t = allTasks.find(t => t.id === id);
+  if (!t || !t.assigned_phone) return;
+  const lines = [
+    `Nueva tarea #${t.id} (${PRIO[t.priority]})`,
+    t.sector ? `Sector: ${t.sector}` : null,
+    `Trabajo: ${t.description}`,
+    t.due_date ? `Fecha limite: ${t.due_date}` : null,
+    '', 'Avisame cuando la empieces y cuando este lista.',
+  ].filter(l => l !== null);
+  openWa(t.assigned_phone, lines.join('\n'));
+}
+
+function waDaily(staffId) {
+  const s = staff.find(s => s.id === staffId);
+  const mine = allTasks.filter(t => t.assigned_to === staffId && t.status !== 'terminada');
+  if (!mine.length) return alert(`${s.name} no tiene tareas pendientes.`);
+  const lines = mine.map(t =>
+    `#${t.id} [${PRIO[t.priority]}] ${t.sector ? t.sector + ' - ' : ''}${t.description}`);
+  openWa(s.phone, `Hola ${s.name}, tus tareas de hoy:\n${lines.join('\n')}`);
+}
 
 async function refresh() {
   [roles, staff] = await Promise.all([api('/api/roles'), api('/api/staff')]);
   const tasks = await api('/api/tasks');
+  allTasks = tasks;
 
   document.querySelector('#roles-list').innerHTML =
     roles.map(r => `<li><b>${r.name}</b>${r.description ? ' - ' + r.description : ''}</li>`).join('');
@@ -109,7 +140,8 @@ async function refresh() {
 
   document.querySelector('#staff-table tbody').innerHTML = staff.map(s => `
     <tr><td>${s.name}</td><td>${s.role_name}</td>
-    <td><span class="pill">${s.active ? 'activo' : 'inactivo'}</span></td></tr>`).join('');
+    <td><span class="pill">${s.active ? 'activo' : 'inactivo'}</span></td>
+    <td class="actions">${s.active ? `<button class="wa" onclick="waDaily(${s.id})">Pendientes</button>` : ''}</td></tr>`).join('');
 
   const staffOpts = '<option value="">Sin asignar</option>' +
     staff.filter(s => s.active).map(s => `<option value="${s.id}">${s.name} (${s.role_name})</option>`).join('');
@@ -126,6 +158,7 @@ async function refresh() {
       <td class="actions">
         ${t.status !== 'terminada' ? `<button onclick="setStatus(${t.id},'terminada')">Listo</button>` : ''}
         ${t.status === 'pendiente' ? `<button onclick="setStatus(${t.id},'en_curso')">Iniciar</button>` : ''}
+        ${t.assigned_phone && t.status !== 'terminada' ? `<button class="wa" onclick="waTask(${t.id})">WhatsApp</button>` : ''}
       </td>
     </tr>`).join('');
 }

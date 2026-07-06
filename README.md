@@ -30,8 +30,18 @@ cp .env.example .env   # completar credenciales de Twilio si se tienen
 npm start              # http://localhost:3000
 ```
 
-Sin credenciales de Twilio la app funciona en **modo simulacion**: los WhatsApp
-salientes se imprimen en consola, util para probar.
+Sin credenciales de Twilio la app funciona igual usando dos mecanismos:
+
+- **Modo wa.me (recomendado para empezar)**: en el panel, cada tarea asignada y
+  cada persona tienen un boton verde de WhatsApp que abre tu WhatsApp con el
+  mensaje ya escrito (asignacion o lista de pendientes del dia). El envio es
+  manual desde tu telefono y los estados se actualizan desde el panel. Gratis,
+  sin configurar nada.
+- **Modo simulacion** para lo automatico: los envios del cron diario se imprimen
+  en consola, util para probar.
+
+Cuando configures Twilio, la automatizacion completa (envio automatico y
+respuestas TOMO/LISTO/PROBLEMA procesadas solas) se activa sin tocar codigo.
 
 ## WhatsApp (Twilio)
 
